@@ -11,11 +11,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use config::{ConfigForDB, ConfigForDynamo};
+use sea_orm::DatabaseConnection;
 
-use crate::{
-    args::{Args, DataStore},
-    config::Config,
-};
+use crate::args::{Args, DataStore};
 
 mod args;
 mod config;
@@ -24,8 +23,8 @@ mod utils;
 
 #[allow(dead_code)]
 #[derive(Clone)]
-struct AppState {
-    config: Config,
+struct AppState<C> {
+    config: C,
     tasks_service: Arc<dyn tasks::Service>,
 }
 
@@ -41,8 +40,15 @@ async fn main() -> anyhow::Result<()> {
 
     let args = output.unwrap();
 
-    let address = args.address.unwrap_or("127.0.0.1".to_string());
-    let port = args.port.unwrap_or(3000);
+    let mut http = config::Http::default();
+
+    if let Some(address) = args.address {
+        http.address = address;
+    }
+
+    if let Some(port) = args.port {
+        http.port = port;
+    }
 
     let data_store: DataStore = args
         .data_store
@@ -50,15 +56,12 @@ async fn main() -> anyhow::Result<()> {
 
     let state = match data_store {
         DataStore::Postgres => {
-            let config = Config {
-                http: config::Http { port, address },
-                db: Some(config::Database {
-                    url: "postgres://localhost:5432/rust_demo".to_string(),
-                }),
-                dynamo: None,
+            let config = ConfigForDB {
+                http: http.clone(),
+                db: config::Database::default(),
             };
 
-            let db = Arc::new(sea_orm::Database::connect(config.db.clone().unwrap().url).await?);
+            let db = Arc::new(sea_orm::Database::connect(config.db.clone().url).await?);
 
             let tasks_service = Arc::new(tasks::service::database::Service::new(db));
 
@@ -68,12 +71,9 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         DataStore::DynamoDB => {
-            let config = Config {
-                http: config::Http { port, address },
-                db: None,
-                dynamo: Some(config::Dynamo {
-                    table_name: "tasks".to_string(),
-                }),
+            let config = ConfigForDynamo {
+                http: http.clone(),
+                dynamo: config::Dynamo::default(),
             };
 
             let client = Arc::new(Client::from_conf(
@@ -101,7 +101,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state);
 
     // run it
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", http.address, http.port))
         .await
         .unwrap();
 
@@ -112,9 +112,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn tasks_get(
+async fn tasks_get<C>(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State(state): State<AppState<C>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let maybe_task = match state.tasks_service.get(&id).await {
         Ok(result) => result,
@@ -128,8 +128,8 @@ async fn tasks_get(
     Err((StatusCode::NOT_FOUND, "Task not found".to_string()))
 }
 
-async fn tasks_create(
-    State(state): State<AppState>,
+async fn tasks_create<C>(
+    State(state): State<AppState<C>>,
     Json(input): Json<tasks::inputs::Create>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let task = match state.tasks_service.create(&input).await {
@@ -140,9 +140,9 @@ async fn tasks_create(
     Ok(Json(task))
 }
 
-async fn tasks_update(
+async fn tasks_update<C>(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State(state): State<AppState<C>>,
     Json(input): Json<tasks::inputs::Update>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let task = match state.tasks_service.update(&id, &input).await {
@@ -153,9 +153,9 @@ async fn tasks_update(
     Ok(Json(task))
 }
 
-async fn tasks_delete(
+async fn tasks_delete<C>(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State(state): State<AppState<C>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     if let Err(e) = state.tasks_service.delete(&id).await {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));

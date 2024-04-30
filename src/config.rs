@@ -1,14 +1,21 @@
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub struct Config {
+#[derive(Clone, Debug, Default)]
+pub struct ConfigForDB {
     /// HTTP config
     pub http: Http,
 
     /// Optional Database config
-    pub db: Option<Database>,
+    pub db: Database,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Default)]
+pub struct ConfigForDynamo {
+    /// HTTP config
+    pub http: Http,
 
     /// Optional Dynamo config
-    pub dynamo: Option<Dynamo>,
+    pub dynamo: Dynamo,
 }
 
 #[allow(dead_code)]
@@ -21,6 +28,15 @@ pub struct Http {
     pub address: String,
 }
 
+impl Default for Http {
+    fn default() -> Self {
+        Self {
+            address: "127.0.0.1".to_string(),
+            port: 3000,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Database {
@@ -28,9 +44,25 @@ pub struct Database {
     pub url: String,
 }
 
+impl Default for Database {
+    fn default() -> Self {
+        Self {
+            url: "postgres://localhost:5432/rust_demo".to_string(),
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct Dynamo {
-    /// The table name to use with DynamoDB
-    pub table_name: String,
+    /// The table name to use for Tasks with DynamoDB
+    pub tasks_table_name: String,
+}
+
+impl Default for Dynamo {
+    fn default() -> Self {
+        Self {
+            tasks_table_name: "tasks".to_string(),
+        }
+    }
 }
