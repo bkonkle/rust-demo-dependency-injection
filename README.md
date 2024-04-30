@@ -7,6 +7,12 @@
 
 A demo project showing dependency injection approaches
 
+## Branches
+
+- [`main`](https://github.com/bkonkle/nakago/tree/main) - The base branch with no dependency injection
+- [`axum`](https://github.com/bkonkle/nakago/tree/axum) - A branch using the Axum framework's dependency injection approach
+- [`nakago`](https://github.com/bkonkle/nakago/tree/nakago) - A branch using the Nakago framework's DI container - `Inject`.
+
 ## Installation
 
 ### Cargo
