@@ -1,21 +1,25 @@
+use axum::extract::FromRef;
+
 #[allow(dead_code)]
-#[derive(Clone, Debug, Default)]
-pub struct ConfigForDB {
+#[derive(Clone, Debug, Default, FromRef)]
+pub struct Config {
     /// HTTP config
     pub http: Http,
 
-    /// Optional Database config
-    pub db: Database,
+    /// Data store config
+    pub data_store: DataStore,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Debug, Default)]
-pub struct ConfigForDynamo {
-    /// HTTP config
-    pub http: Http,
+#[derive(Clone, Debug)]
+pub enum DataStore {
+    Postgres(Database),
+    Dynamo(Dynamo),
+}
 
-    /// Optional Dynamo config
-    pub dynamo: Dynamo,
+impl Default for DataStore {
+    fn default() -> Self {
+        Self::Postgres(Database::default())
+    }
 }
 
 #[allow(dead_code)]
