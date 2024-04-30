@@ -1,47 +1,54 @@
 use axum::extract::FromRef;
-use nakago::Tag;
 use nakago_sea_orm::DatabasePool;
 use serde::{Deserialize, Serialize};
 
-/// Tag(Config)
-pub const CONFIG: Tag<Config> = Tag::new("app::Config");
-
 #[allow(dead_code)]
-#[derive(Clone, Debug, Serialize, Deserialize, Default, FromRef)]
-pub struct Config {
+#[derive(Clone, Debug, Serialize, Deserialize, FromRef)]
+pub struct ConfigForDatabase {
     /// HTTP config
     pub http: nakago_axum::Config,
 
-    /// Data store config
-    pub data_store: DataStore,
+    /// Database config
+    pub db: nakago_sea_orm::Config,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DataStore {
-    Postgres(nakago_sea_orm::Config),
-    Dynamo(Dynamo),
-}
-
-impl Default for DataStore {
+impl Default for ConfigForDatabase {
     fn default() -> Self {
-        Self::Postgres(default_db_config())
+        Self {
+            http: default_http_config(),
+            db: nakago_sea_orm::Config {
+                url: "postgres://localhost:5432/rust_demo".to_string(),
+                debug: false,
+                pool: DatabasePool::default(),
+            },
+        }
     }
 }
 
-pub fn default_http_config() -> nakago_axum::Config {
-    nakago_axum::Config {
-        address: "127.0.0.1".to_string(),
-        port: 3000,
+impl nakago::Config for ConfigForDatabase {}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Serialize, Deserialize, FromRef)]
+pub struct ConfigForDynamo {
+    /// HTTP config
+    pub http: nakago_axum::Config,
+
+    /// DynamoDB config
+    pub dynamo: Dynamo,
+}
+
+impl Default for ConfigForDynamo {
+    fn default() -> Self {
+        Self {
+            http: default_http_config(),
+            dynamo: Dynamo {
+                tasks_table_name: "tasks".to_string(),
+            },
+        }
     }
 }
 
-pub fn default_db_config() -> nakago_sea_orm::Config {
-    nakago_sea_orm::Config {
-        url: "postgres://localhost:5432/rust_demo".to_string(),
-        debug: false,
-        pool: DatabasePool::default(),
-    }
-}
+impl nakago::Config for ConfigForDynamo {}
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,12 +57,9 @@ pub struct Dynamo {
     pub tasks_table_name: String,
 }
 
-impl Default for Dynamo {
-    fn default() -> Self {
-        Self {
-            tasks_table_name: "tasks".to_string(),
-        }
+pub fn default_http_config() -> nakago_axum::Config {
+    nakago_axum::Config {
+        address: "127.0.0.1".to_string(),
+        port: 3000,
     }
 }
-
-impl nakago::Config for Config {}

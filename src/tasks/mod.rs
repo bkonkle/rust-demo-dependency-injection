@@ -7,4 +7,7 @@ pub mod service;
 /// The Task entity input types
 pub mod inputs;
 
+/// The Task entity HTTP handlers
+pub mod http;
+
 pub use service::Service;
