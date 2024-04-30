@@ -1,6 +1,6 @@
 //! A struct representing an optional Update. This update can be Unchanged, set to Empty, or set to
 //! a particular Value.
-//!
+
 use std::ops::Deref;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -68,6 +68,7 @@ impl<T> Update<T> {
     }
 
     /// Converts the `Update<T>` to `Option<Option<T>>`.
+    #[allow(clippy::option_option)]
     #[inline]
     pub const fn as_opt_ref(&self) -> Option<Option<&T>> {
         match self {
@@ -78,6 +79,7 @@ impl<T> Update<T> {
     }
 
     /// Converts the `Update<T>` to `Option<Option<&U>>`.
+    #[allow(clippy::option_option)]
     #[inline]
     pub fn as_opt_deref<U>(&self) -> Option<Option<&U>>
     where

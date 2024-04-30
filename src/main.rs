@@ -12,19 +12,20 @@ use axum::{
     Json, Router,
 };
 
-use crate::args::{Args, DataStore};
+use crate::{
+    args::{Args, DataStore},
+    config::Config,
+};
 
-/// The Task entity
-pub mod tasks;
+mod args;
+mod config;
+mod tasks;
+mod utils;
 
-/// Utilities
-pub mod utils;
-
-/// CLI Arguments
-pub mod args;
-
+#[allow(dead_code)]
 #[derive(Clone)]
 struct AppState {
+    config: Config,
     tasks_service: Arc<dyn tasks::Service>,
 }
 
@@ -40,20 +41,41 @@ async fn main() -> anyhow::Result<()> {
 
     let args = output.unwrap();
 
+    let address = args.address.unwrap_or("127.0.0.1".to_string());
+    let port = args.port.unwrap_or(3000);
+
     let data_store: DataStore = args
         .data_store
         .map_or(Ok(DataStore::Postgres), |v| v.try_into())?;
 
     let state = match data_store {
         DataStore::Postgres => {
-            let db =
-                Arc::new(sea_orm::Database::connect("postgres://localhost:5432/rust_demo").await?);
+            let config = Config {
+                http: config::Http { port, address },
+                db: Some(config::Database {
+                    url: "postgres://localhost:5432/rust_demo".to_string(),
+                }),
+                dynamo: None,
+            };
+
+            let db = Arc::new(sea_orm::Database::connect(config.db.clone().unwrap().url).await?);
 
             let tasks_service = Arc::new(tasks::service::database::Service::new(db));
 
-            AppState { tasks_service }
+            AppState {
+                config,
+                tasks_service,
+            }
         }
         DataStore::DynamoDB => {
+            let config = Config {
+                http: config::Http { port, address },
+                db: None,
+                dynamo: Some(config::Dynamo {
+                    table_name: "tasks".to_string(),
+                }),
+            };
+
             let client = Arc::new(Client::from_conf(
                 aws_sdk_dynamodb::Config::builder().build(),
             ));
@@ -63,7 +85,10 @@ async fn main() -> anyhow::Result<()> {
                 "tasks".to_string(),
             ));
 
-            AppState { tasks_service }
+            AppState {
+                config,
+                tasks_service,
+            }
         }
     };
 

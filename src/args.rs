@@ -1,20 +1,24 @@
 use pico_args::Arguments;
 
-pub(crate) const HELP: &str = "\
+pub const HELP: &str = "\
 Usage: rust-demo-dependency-injection [OPTIONS]
 
 Options:
   -h, --help           Print help (this message)
   -d, --data-store     The data store to use: 'postgres' or 'dynamodb', defaults to 'postgres'
+  -a, --address        The address to bind to, defaults to '127.0.0.1'
+  -p, --port           The port to bind to, defaults to '3000'
 ";
 
 #[derive(Debug)]
-pub(crate) struct Args {
-    pub(crate) data_store: Option<String>,
+pub struct Args {
+    pub data_store: Option<String>,
+    pub address: Option<String>,
+    pub port: Option<u16>,
 }
 
 impl Args {
-    pub(crate) fn parse() -> anyhow::Result<Option<Self>> {
+    pub fn parse() -> anyhow::Result<Option<Self>> {
         let mut pargs = Arguments::from_env();
 
         // Help has a higher priority and should be handled separately.
@@ -24,6 +28,8 @@ impl Args {
 
         let args = Args {
             data_store: pargs.opt_value_from_str(["-d", "--data-store"])?,
+            address: pargs.opt_value_from_str(["-a", "--address"])?,
+            port: pargs.opt_value_from_str(["-p", "--port"])?,
         };
 
         Ok(Some(args))
@@ -31,7 +37,7 @@ impl Args {
 }
 
 #[derive(Debug)]
-pub(crate) enum DataStore {
+pub enum DataStore {
     Postgres,
     DynamoDB,
 }
