@@ -19,6 +19,7 @@ use crate::{
 
 mod args;
 mod config;
+mod init;
 mod tasks;
 mod utils;
 

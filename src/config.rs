@@ -1,36 +1,28 @@
+use axum::extract::FromRef;
+use nakago::Tag;
+use serde::{Deserialize, Serialize};
+
+/// Tag(Config)
+pub const CONFIG: Tag<Config> = Tag::new("app::Config");
+
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, FromRef)]
 pub struct Config {
     /// HTTP config
-    pub http: Http,
+    pub http: nakago_axum::Config,
 
-    /// Optional Database config
-    pub db: Option<Database>,
+    /// Database config
+    pub database: nakago_sea_orm::Config,
 
     /// Optional Dynamo config
     pub dynamo: Option<Dynamo>,
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub struct Http {
-    /// The port to bind to
-    pub port: u16,
-
-    /// The IP address to bind to, such as 0.0.0.0 or 127.0.0.1
-    pub address: String,
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub struct Database {
-    /// The database URL to use with Postgres
-    pub url: String,
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Dynamo {
     /// The table name to use with DynamoDB
     pub table_name: String,
 }
+
+impl nakago::Config for Config {}
