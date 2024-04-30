@@ -1,17 +1,12 @@
 # rust-demo-dependency-injection
 
-[![Crates.io](https://img.shields.io/crates/v/rust-demo-dependency-injection.svg)](https://crates.io/crates/rust-demo-dependency-injection)
-[![Docs.rs](https://docs.rs/rust-demo-dependency-injection/badge.svg)](https://docs.rs/rust-demo-dependency-injection)
-[![CI](https://github.com/bkonkle/rust-demo-dependency-injection/workflows/CI/badge.svg)](https://github.com/bkonkle/rust-demo-dependency-injection/actions)
-[![Coverage Status](https://coveralls.io/repos/github/bkonkle/rust-demo-dependency-injection/badge.svg?branch=main)](https://coveralls.io/github/bkonkle/rust-demo-dependency-injection?branch=main)
-
 A demo project showing dependency injection approaches
 
 ## Branches
 
-- [`main`](https://github.com/bkonkle/nakago/tree/main) - The base branch with no dependency injection
-- [`axum`](https://github.com/bkonkle/nakago/tree/axum) - A branch using the Axum framework's dependency injection approach
-- [`nakago`](https://github.com/bkonkle/nakago/tree/nakago) - A branch using the Nakago framework's DI container - `Inject`.
+- [`main`](https://github.com/bkonkle/rust-demo-dependency-injection/tree/main) - The base branch with no dependency injection
+- [`axum`](https://github.com/bkonkle/rust-demo-dependency-injection/tree/axum) - A branch using the Axum framework's dependency injection approach
+- [`nakago`](https://github.com/bkonkle/rust-demo-dependency-injection/tree/nakago) - A branch using the Nakago framework's DI container - `Inject`.
 
 ## Installation
 
