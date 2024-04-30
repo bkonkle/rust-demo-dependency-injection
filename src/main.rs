@@ -13,24 +13,27 @@ use axum::{
 };
 use sea_orm::DatabaseConnection;
 
-use crate::args::{Args, DataStore};
+use crate::{
+    args::{Args, DataStore},
+    config::Config,
+};
 
-/// The Task entity
-pub mod tasks;
+mod args;
+mod config;
+mod tasks;
+mod utils;
 
-/// Utilities
-pub mod utils;
-
-/// CLI Arguments
-pub mod args;
-
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DatabaseAppState {
+    config: Config,
     db: Arc<DatabaseConnection>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DynamoAppState {
+    config: Config,
     client: Arc<Client>,
     task_table_name: String,
 }
@@ -47,16 +50,26 @@ async fn main() -> anyhow::Result<()> {
 
     let args = output.unwrap();
 
+    let address = args.address.unwrap_or("127.0.0.1".to_string());
+    let port = args.port.unwrap_or(3000);
+
     let data_store: DataStore = args
         .data_store
         .map_or(Ok(DataStore::Postgres), |v| v.try_into())?;
 
     let app = match data_store {
         DataStore::Postgres => {
-            let db =
-                Arc::new(sea_orm::Database::connect("postgres://localhost:5432/rust_demo").await?);
+            let config = Config {
+                http: config::Http { port, address },
+                db: Some(config::Database {
+                    url: "postgres://localhost:5432/rust_demo".to_string(),
+                }),
+                dynamo: None,
+            };
 
-            let state = DatabaseAppState { db };
+            let db = Arc::new(sea_orm::Database::connect(config.db.clone().unwrap().url).await?);
+
+            let state = DatabaseAppState { db, config };
 
             Router::new()
                 .route("/tasks", post(tasks_create_in_db))
@@ -69,13 +82,22 @@ async fn main() -> anyhow::Result<()> {
                 .with_state(state)
         }
         DataStore::DynamoDB => {
+            let config = Config {
+                http: config::Http { port, address },
+                db: None,
+                dynamo: Some(config::Dynamo {
+                    table_name: "tasks".to_string(),
+                }),
+            };
+
             let client = Arc::new(Client::from_conf(
                 aws_sdk_dynamodb::Config::builder().build(),
             ));
 
             let state = DynamoAppState {
                 client,
-                task_table_name: "tasks".to_string(),
+                task_table_name: config.dynamo.clone().unwrap().table_name.clone(),
+                config,
             };
 
             Router::new()
