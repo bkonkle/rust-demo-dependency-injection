@@ -14,7 +14,7 @@ use axum::{
 
 use crate::{
     args::{Args, DataStore},
-    config::Config,
+    config::{default_db_config, default_http_config, Config},
 };
 
 mod args;
@@ -42,8 +42,15 @@ async fn main() -> anyhow::Result<()> {
 
     let args = output.unwrap();
 
-    let address = args.address.unwrap_or("127.0.0.1".to_string());
-    let port = args.port.unwrap_or(3000);
+    let mut http = default_http_config();
+
+    if let Some(address) = args.address {
+        http.address = address;
+    }
+
+    if let Some(port) = args.port {
+        http.port = port;
+    }
 
     let data_store: DataStore = args
         .data_store
@@ -51,15 +58,14 @@ async fn main() -> anyhow::Result<()> {
 
     let state = match data_store {
         DataStore::Postgres => {
+            let db = default_db_config();
+
             let config = Config {
-                http: config::Http { port, address },
-                db: Some(config::Database {
-                    url: "postgres://localhost:5432/rust_demo".to_string(),
-                }),
-                dynamo: None,
+                http: http.clone(),
+                data_store: config::DataStore::Postgres(db.clone()),
             };
 
-            let db = Arc::new(sea_orm::Database::connect(config.db.clone().unwrap().url).await?);
+            let db = Arc::new(sea_orm::Database::connect(db.url).await?);
 
             let tasks_service = Arc::new(tasks::service::database::Service::new(db));
 
@@ -69,12 +75,11 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         DataStore::DynamoDB => {
+            let dynamo = config::Dynamo::default();
+
             let config = Config {
-                http: config::Http { port, address },
-                db: None,
-                dynamo: Some(config::Dynamo {
-                    table_name: "tasks".to_string(),
-                }),
+                http: http.clone(),
+                data_store: config::DataStore::Dynamo(dynamo.clone()),
             };
 
             let client = Arc::new(Client::from_conf(
@@ -102,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state);
 
     // run it
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", http.address, http.port))
         .await
         .unwrap();
 
