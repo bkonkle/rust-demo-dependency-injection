@@ -11,12 +11,10 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use config::{ConfigForDB, ConfigForDynamo};
 use sea_orm::DatabaseConnection;
 
-use crate::{
-    args::{Args, DataStore},
-    config::Config,
-};
+use crate::args::{Args, DataStore};
 
 mod args;
 mod config;
@@ -26,16 +24,16 @@ mod utils;
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DatabaseAppState {
-    config: Config,
+    config: ConfigForDB,
     db: Arc<DatabaseConnection>,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DynamoAppState {
-    config: Config,
+    config: ConfigForDynamo,
     client: Arc<Client>,
-    task_table_name: String,
+    tasks_table_name: String,
 }
 
 #[tokio::main]
@@ -50,8 +48,15 @@ async fn main() -> anyhow::Result<()> {
 
     let args = output.unwrap();
 
-    let address = args.address.unwrap_or("127.0.0.1".to_string());
-    let port = args.port.unwrap_or(3000);
+    let mut http = config::Http::default();
+
+    if let Some(address) = args.address {
+        http.address = address;
+    }
+
+    if let Some(port) = args.port {
+        http.port = port;
+    }
 
     let data_store: DataStore = args
         .data_store
@@ -59,15 +64,12 @@ async fn main() -> anyhow::Result<()> {
 
     let app = match data_store {
         DataStore::Postgres => {
-            let config = Config {
-                http: config::Http { port, address },
-                db: Some(config::Database {
-                    url: "postgres://localhost:5432/rust_demo".to_string(),
-                }),
-                dynamo: None,
+            let config = ConfigForDB {
+                http: http.clone(),
+                db: config::Database::default(),
             };
 
-            let db = Arc::new(sea_orm::Database::connect(config.db.clone().unwrap().url).await?);
+            let db = Arc::new(sea_orm::Database::connect(config.db.clone().url).await?);
 
             let state = DatabaseAppState { db, config };
 
@@ -82,12 +84,9 @@ async fn main() -> anyhow::Result<()> {
                 .with_state(state)
         }
         DataStore::DynamoDB => {
-            let config = Config {
-                http: config::Http { port, address },
-                db: None,
-                dynamo: Some(config::Dynamo {
-                    table_name: "tasks".to_string(),
-                }),
+            let config = ConfigForDynamo {
+                http: http.clone(),
+                dynamo: config::Dynamo::default(),
             };
 
             let client = Arc::new(Client::from_conf(
@@ -96,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
 
             let state = DynamoAppState {
                 client,
-                task_table_name: config.dynamo.clone().unwrap().table_name.clone(),
+                tasks_table_name: config.dynamo.clone().tasks_table_name.clone(),
                 config,
             };
 
@@ -113,7 +112,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // run it
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", http.address, http.port))
         .await
         .unwrap();
 
@@ -144,11 +143,16 @@ async fn tasks_get_from_dynamo(
     Path(id): Path<String>,
     State(state): State<DynamoAppState>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let maybe_task =
-        match tasks::dynamo_service::get(state.client.clone(), &state.task_table_name, &id).await {
-            Ok(result) => result,
-            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
-        };
+    let maybe_task = match tasks::dynamo_service::get(
+        state.client.clone(),
+        &state.tasks_table_name,
+        &id,
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    };
 
     if let Some(task) = maybe_task {
         return Ok(Json(task));
@@ -174,7 +178,7 @@ async fn tasks_create_in_dynamo(
     Json(input): Json<tasks::inputs::Create>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let task =
-        match tasks::dynamo_service::create(state.client.clone(), &state.task_table_name, &input)
+        match tasks::dynamo_service::create(state.client.clone(), &state.tasks_table_name, &input)
             .await
         {
             Ok(result) => result,
@@ -204,7 +208,7 @@ async fn tasks_update_in_dynamo(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let task = match tasks::dynamo_service::update(
         state.client.clone(),
-        &state.task_table_name,
+        &state.tasks_table_name,
         &id,
         &input,
     )
@@ -233,7 +237,7 @@ async fn tasks_delete_in_dynamo(
     State(state): State<DynamoAppState>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     if let Err(e) =
-        tasks::dynamo_service::delete(state.client.clone(), &state.task_table_name, &id).await
+        tasks::dynamo_service::delete(state.client.clone(), &state.tasks_table_name, &id).await
     {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
